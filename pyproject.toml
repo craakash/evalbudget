@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evalbudget"
+version = "0.1.0"
+description = "Pick AI model setups on total cost per task: quality gates first, then spend plus what failures cost"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{ name = "craakash" }]
+readme = "README.md"
+dependencies = []
+keywords = ["llm", "evals", "model-selection", "cost", "budget"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+evalbudget = "evalbudget.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
