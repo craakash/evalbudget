@@ -31,6 +31,7 @@ def main(argv=None):
     d.add_argument("--cost", nargs="+", required=True, metavar="SEV=USD")
     d.add_argument("--min-pass", type=float, default=0.0)
     d.add_argument("--max-critical", type=float, default=1.0)
+    d.add_argument("--pass-on-lower", action="store_true", help="check --min-pass against the lower bound")
     d.add_argument("--max-p95-latency", type=float, default=float("inf"))
     d.add_argument("--max-timeout-rate", type=float, default=1.0)
     d.add_argument("--volume", type=int, help="tasks per month, to print a monthly budget")
@@ -54,7 +55,7 @@ def main(argv=None):
     elif a.cmd == "bound":
         print(f"true rate could be up to {rate_upper_bound(a.k, a.n, a.conf):.2%}")
     else:
-        gates = Gates(a.min_pass, a.max_critical, a.max_p95_latency, a.max_timeout_rate)
+        gates = Gates(a.min_pass, a.max_critical, a.max_p95_latency, a.max_timeout_rate, pass_on_lower=a.pass_on_lower)
         rows = decide(summarise(load_runs(a.runs)), gates, _costs(a.cost))
         hdr = f"{'setup':<28}{'cases':>6}{'pass':>8}{'interval':>16}{'spend/task':>12}{'total/task':>12}"
         if a.volume:

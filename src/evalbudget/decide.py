@@ -20,6 +20,7 @@ class Gates:
     max_p95_latency: float = float("inf")
     max_timeout_rate: float = 1.0
     conf: float = 0.95
+    pass_on_lower: bool = False  # check min_pass against the one-sided lower bound: a margin for noise and drift
 
 
 @dataclass
@@ -30,6 +31,7 @@ class Summary:
     pass_interval: tuple
     critical_cases: int
     critical_upper: float
+    pass_lower: float = 0.0
     p95_latency: float = None
     timeout_rate: float = 0.0
     dimension_pass: dict = field(default_factory=dict)
@@ -87,11 +89,13 @@ def summarise(rows, conf=0.95):
                 means[case_cluster[cid]].append(sum(v) / len(v))
                 crits[case_cluster[cid]].append(1 if cid in crit_cases else 0)
             pass_iv = cluster_bootstrap(means, conf)
+            pass_lo = cluster_bootstrap(means, 2 * conf - 1)[0]
             # one-sided upper bound: take the upper end of a (2*conf - 1) two-sided interval
             crit_up = cluster_bootstrap(crits, 2 * conf - 1)[1]
         else:
             k = sum(v[0] for v in case_runs.values())
             pass_iv = wilson(k, len(case_runs), conf)
+            pass_lo = wilson(k, len(case_runs), 2 * conf - 1)[0]
             crit_up = rate_upper_bound(len(crit_cases), len(case_runs), conf)
 
         dims = defaultdict(list)
@@ -107,6 +111,7 @@ def summarise(rows, conf=0.95):
             pass_interval=pass_iv,
             critical_cases=len(crit_cases),
             critical_upper=crit_up,
+            pass_lower=pass_lo,
             p95_latency=_p95(lat),
             timeout_rate=sum(_truthy(r.get("timeout", 0)) for r in rs) / n,
             dimension_pass={d: sum(v) / len(v) for d, v in dims.items()},
@@ -116,7 +121,9 @@ def summarise(rows, conf=0.95):
 
 def gate_failures(s, gates):
     reasons = []
-    if s.setup.pass_rate < gates.min_pass:
+    if gates.pass_on_lower and s.pass_lower < gates.min_pass:
+        reasons.append(f"pass could be {s.pass_lower:.1%} < {gates.min_pass:.1%}")
+    elif s.setup.pass_rate < gates.min_pass:
         reasons.append(f"pass {s.setup.pass_rate:.1%} < {gates.min_pass:.1%}")
     for d, p in s.dimension_pass.items():
         if p < gates.min_pass:

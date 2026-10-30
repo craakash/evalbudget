@@ -151,3 +151,31 @@ def test_cli(tmp_path, capsys):
     assert "pick: big" in capsys.readouterr().out
     main(["bound", "0", "50"])
     assert "5.8" in capsys.readouterr().out
+
+
+def _rows(name, k, n):
+    return [dict(setup=name, case_id=f"c{i}", passed=int(i < k), severity="" if i < k else "major", cost_usd=0.01)
+            for i in range(n)]
+
+
+def test_eighty_six_of_fifty_clears_point_gate_not_lower_bound():
+    s = summarise(_rows("m", 43, 50))
+    assert decide(s, Gates(min_pass=0.85), {"major": 4})[0]["gates"] == "ok"
+    gated = decide(s, Gates(min_pass=0.85, pass_on_lower=True), {"major": 4})[0]["gates"]
+    assert gated.startswith("pass could be 76.1%")
+
+
+@pytest.mark.parametrize("n,k", [(50, 47), (100, 91), (300, 266)])
+def test_passes_needed_for_lower_bound_to_clear_85(n, k):
+    lower = lambda k: summarise(_rows("m", k, n))["m"].pass_lower
+    assert lower(k) >= 0.85 > lower(k - 1)
+
+
+def test_cli_pass_on_lower(tmp_path, capsys):
+    p = tmp_path / "runs.csv"
+    with open(p, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(_rows("m", 1, 1)[0]))
+        w.writeheader()
+        w.writerows(_rows("m", 43, 50))
+    main(["decide", str(p), "--cost", "major=4", "--min-pass", "0.85", "--pass-on-lower"])
+    assert "no setup clears the gates" in capsys.readouterr().out
